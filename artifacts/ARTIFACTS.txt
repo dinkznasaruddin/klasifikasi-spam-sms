@@ -1,0 +1,5 @@
+Artifacts generated:
+- champion_nb.joblib
+- backup_lr.joblib
+- metrics.json
+- confusion_matrix_test.png
