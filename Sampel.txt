@@ -1,0 +1,9 @@
+id,text,label_expected
+1,"Selamat! Anda memenangkan hadiah Rp10.000.000. Klaim di http://hadiah-cepat[.]com",spam
+2,"Akun BCA Anda diblokir sementara. Verifikasi di bit.ly/bca-aktif",spam
+3,"Besok rapat jam 09.00 di ruang meeting lantai 3",ham
+4,"Kode OTP BankX: 432198. JANGAN bagikan kepada siapa pun",borderline
+5,"Gr@t1s ku0ta 50GB! K1ik tautan: http://qu0ta‑promo[.]vip",spam
+6,"Jadwal kuliah minggu depan sudah diunggah di LMS",ham
+7,"Paket Anda tertahan di bea cukai. Segera bayar biaya admin di https://kurir‑cek[.]site",spam
+8,"Link materi presentasi: https://drive.google.com/…",ham

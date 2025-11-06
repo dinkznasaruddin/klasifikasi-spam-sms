@@ -24,16 +24,17 @@
 
 # EDA: Distribusi Panjang Pesan
 ![Distribusi Panjang Pesan](../artifacts/len_hist.png)
+- Histogram menunjukkan jumlah token per pesan untuk ham vs spam.
 - Rata-rata token: semua ≈ 15,60; ham ≈ 14,31; spam ≈ 23,91.
-- Spam cenderung lebih panjang dari ham.
+- Warna membedakan kelas; kurva lebih ke kanan = pesan lebih panjang. Spam cenderung lebih panjang dari ham.
 
-# EDA: Top Token Spam
+# EDA: Top Token Spam vs Ham
 ![Top Token Spam](../artifacts/top_tokens_spam.png)
-- Kata pemicu: "free", "win", "urgent", "claim", "call", "prize".
-
-# EDA: Top Token Ham
 ![Top Token Ham](../artifacts/top_tokens_ham.png)
-- Ham berisi percakapan sehari-hari, konfirmasi, dan info non-promosi.
+- Spam: kata pemicu umum seperti "free", "win", "urgent", "claim", "call", "prize".
+- Ham: percakapan sehari-hari, konfirmasi, informasi non-promosi.
+- Setiap bar mewakili seberapa sering kata muncul di kelas terkait (lebih panjang = lebih sering).
+- Insight: banyak spam memuat kata promosi/ajakan tindakan; ham didominasi kata percakapan biasa.
 
 # Metodologi & Pipeline
 - Praproses: lowercasing, TF–IDF (unigram–bigram), stopwords Inggris.
@@ -71,21 +72,32 @@
 ![ROC LR Test](../artifacts/roc_lr_test.png)
 
 ![PR LR Test](../artifacts/pr_lr_test.png)
+- ROC: sumbu X = False Positive Rate, Y = True Positive Rate. Semakin dekat ke pojok kiri-atas semakin baik; luas area (AUC) mendekati 1 = performa sangat baik.
+- PR: sumbu X = Recall, Y = Precision. Lebih informatif saat kelas spam lebih sedikit; kurva tinggi dan ke kanan menandakan precision dan recall sama-sama bagus.
+- Memindahkan threshold akan menggeser posisi pada kurva — bisa dipilih sesuai prioritas (minim FP vs minim FN).
 
 # Analisis Kesalahan & Confusion Matrix
 - False positive: pesan promosi sah dengan kata mirip spam.
 - False negative: obfuscation ("GR4T1S"), URL pendek, bahasa campuran.
 ![CM Test](../artifacts/confusion_matrix_test.png)
+- Confusion matrix: baris = label sebenarnya, kolom = prediksi model.
+- Nilai diagonal (kiri-atas & kanan-bawah) adalah prediksi benar — makin besar makin baik.
+- Sel kanan-atas = ham→spam (FP), sel kiri-bawah = spam→ham (FN). Tuning threshold/fitur dapat mengurangi keduanya.
 
-# Prototipe & Integrasi
+# Prototipe, Integrasi, & MLOps/Keamanan
 - Streamlit: input teks, probabilitas, pengaturan threshold.
 - Flask API: endpoint /predict untuk integrasi sistem.
-- Inferensi cepat, footprint kecil — cocok untuk edge.
+- Monitoring: skor, drift, keluhan pengguna; kalibrasi & thresholding berbasis biaya.
+- Privasi: minimisasi data, enkripsi, retensi terbatas. Inferensi cepat, footprint kecil (edge-friendly).
 
-# MLOps & Keamanan
-- Monitoring: skor, drift, keluhan pengguna.
-- Kalibrasi & thresholding berbasis biaya.
-- Privasi: minimisasi data, enkripsi, retensi terbatas.
+# Manfaat & Penerapan Sehari-hari
+- Operator seluler: memfilter SMS spam/phishing sebelum mencapai pelanggan; menurunkan komplain dan beban CS.
+- Perbankan/fintech: proteksi phishing pada notifikasi/OTP; pengurangan fraud dan kerugian finansial.
+- E-commerce/logistik: penyaringan blast promo & notifikasi agar relevan, menghindari false spam pada pesan sah.
+- Pemerintah/layanan publik: memastikan SMS informasi darurat/layanan tidak ditandai spam.
+- Perusahaan: triase inbound SMS (dukungan pelanggan), eskalasi otomatis untuk pesan berisiko.
+- Individu/app pribadi: perlindungan spam on-device; model ringan cocok untuk perangkat lama.
+- Keamanan & kepatuhan: membantu pemenuhan kebijakan anti-spam dan perlindungan data.
 
 # Kesimpulan & Pekerjaan Lanjutan
 - Pipeline TF–IDF + LR/MNB efektif dan ringan.

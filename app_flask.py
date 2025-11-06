@@ -39,5 +39,24 @@ def predict():
         "model_file": model_file
     })
 
+# Tambahkan endpoint ramah pengguna agar halaman root tidak 404
+@app.route("/", methods=["GET"])
+def index():
+    return (
+        "<h2>Spam SMS Classifier API</h2>"
+        "<p>Gunakan endpoint <code>POST /predict</code> dengan JSON seperti: </p>"
+        "<pre>{\n  \"text\": \"Congratulations! You won a free prize!\",\n  \"model\": \"lr\",\n  \"threshold\": 0.5\n}</pre>"
+        "<p>Contoh curl:</p>"
+        "<pre>curl -X POST http://localhost:5000/predict -H 'Content-Type: application/json' "
+        "-d '{""text"": ""Congrats! You win prize"", ""model"": ""lr"", ""threshold"": 0.5}'</pre>"
+        "<p>Health check: <a href='/health'>/health</a></p>",
+        200,
+        {"Content-Type": "text/html; charset=utf-8"},
+    )
+
+@app.route("/health", methods=["GET"])
+def health():
+    return jsonify({"status": "ok"})
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))

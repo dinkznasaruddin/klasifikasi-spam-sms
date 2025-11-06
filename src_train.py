@@ -10,7 +10,8 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split, StratifiedKFold, GridSearchCV
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.pipeline import Pipeline
+from sklearn.pipeline import Pipeline, FeatureUnion
+from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
@@ -21,6 +22,8 @@ from sklearn.preprocessing import label_binarize
 import matplotlib.pyplot as plt
 import seaborn as sns
 import joblib
+from scipy import sparse
+import re
 
 RANDOM_STATE = 42
 ARTIFACT_DIR = Path("artifacts")
@@ -29,6 +32,41 @@ ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
 UCI_ZIP_URL = "https://archive.ics.uci.edu/ml/machine-learning-databases/00228/smsspamcollection.zip"
 DATA_DIR = Path("data")
 DATA_DIR.mkdir(exist_ok=True)
+
+
+class LexicalFeatures(BaseEstimator, TransformerMixin):
+    """Simple regex-based binary features to help catch Indonesian spam cues.
+
+    Features (columns):
+      0: has_url
+      1: has_shortener
+      2: has_money_token (rp/idr/$ or numeric currency-like)
+      3: has_bank_keyword (bca,bni,bri,mandiri,cimb,ovo,dana,gopay,wa.me)
+      4: has_action_keyword (verifikasi, blokir, aktif, klik, konfirmasi, bayar, klaim)
+    """
+
+    def __init__(self):
+        self.re_url = re.compile(r"(https?://|www\.|wa\.me)", re.I)
+        self.re_short = re.compile(r"(bit\.ly|goo\.gl|s\.id|tinyurl|t\.co|cutt\.ly)", re.I)
+        self.re_money = re.compile(r"(\brp\b|\bidr\b|\$|\d{2,3}[\.\s]?\d{3})", re.I)
+        self.re_bank = re.compile(r"\b(bca|bni|bri|mandiri|cimb|ovo|dana|gopay)\b", re.I)
+        self.re_action = re.compile(r"\b(verifikasi|blokir|aktif|konfirmasi|klaim|claim|bayar|klik)\b", re.I)
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X):
+        rows = []
+        for text in X:
+            t = str(text)
+            has_url = 1 if self.re_url.search(t) else 0
+            has_short = 1 if self.re_short.search(t) else 0
+            has_money = 1 if self.re_money.search(t) else 0
+            has_bank = 1 if self.re_bank.search(t) else 0
+            has_action = 1 if self.re_action.search(t) else 0
+            rows.append([has_url, has_short, has_money, has_bank, has_action])
+        mat = np.asarray(rows, dtype=np.float32)
+        return sparse.csr_matrix(mat)
 
 def download_dataset() -> Path:
     zip_path = DATA_DIR / "smsspamcollection.zip"
@@ -59,29 +97,53 @@ def split_data(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFra
     return train_df, val_df, test_df
 
 def build_pipelines() -> Dict[str, Pipeline]:
+    features_nb = FeatureUnion([
+        ("tfidf", TfidfVectorizer()),
+        ("lex", LexicalFeatures()),
+    ])
+    features_lr = FeatureUnion([
+        ("tfidf", TfidfVectorizer()),
+        ("lex", LexicalFeatures()),
+    ])
     pipe_nb = Pipeline(steps=[
-        ("tfidf", TfidfVectorizer(stop_words="english")),
+        ("features", features_nb),
         ("clf", MultinomialNB())
     ])
     pipe_lr = Pipeline(steps=[
-        ("tfidf", TfidfVectorizer(stop_words="english")),
+        ("features", features_lr),
         ("clf", LogisticRegression(max_iter=1000, solver="liblinear"))
     ])
     return {"nb": pipe_nb, "lr": pipe_lr}
 
 def param_grids() -> Dict[str, Dict]:
+    # NB (word features); stop_words dimatikan agar tidak salah untuk bahasa non-Inggris
     grid_nb = {
-        "tfidf__ngram_range": [(1,1), (1,2)],
-        "tfidf__min_df": [1, 2, 5],
-        "clf__alpha": [0.1, 0.5, 1.0]
+        "features__tfidf__analyzer": ["word"],
+        "features__tfidf__stop_words": [None, "english"],
+        "features__tfidf__ngram_range": [(1,1), (1,2)],
+        "features__tfidf__min_df": [1, 2],
+        "clf__alpha": [0.1, 0.5]
     }
-    grid_lr = {
-        "tfidf__ngram_range": [(1,1), (1,2)],
-        "tfidf__min_df": [1, 2, 5],
-        "clf__C": [0.5, 1.0, 2.0, 4.0],
-        "clf__penalty": ["l2"],
-        "clf__class_weight": [None, "balanced"]
-    }
+    # LR: dua skenario grid — word-level dan char-level (lebih tangguh lintas bahasa/obfuscation)
+    grid_lr = [
+        {
+            "features__tfidf__analyzer": ["word"],
+            "features__tfidf__stop_words": [None, "english"],
+            "features__tfidf__ngram_range": [(1,1), (1,2)],
+            "features__tfidf__min_df": [1, 2],
+            "clf__C": [0.5, 1.0, 2.0],
+            "clf__penalty": ["l2"],
+            "clf__class_weight": [None, "balanced"]
+        },
+        {
+            "features__tfidf__analyzer": ["char_wb"],
+            "features__tfidf__ngram_range": [(3,5)],
+            "features__tfidf__min_df": [1],
+            "clf__C": [1.0, 2.0],
+            "clf__penalty": ["l2"],
+            "clf__class_weight": [None, "balanced"]
+        }
+    ]
     return {"nb": grid_nb, "lr": grid_lr}
 
 def evaluate(y_true: np.ndarray, y_prob: np.ndarray, threshold: float = 0.5) -> Dict:
